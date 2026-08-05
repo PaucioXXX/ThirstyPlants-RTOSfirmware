@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "PlatformIO Build",
+			"type": "shell",
+			"command": "cd c:\\Users\\paulr\\Documents\\PlatformIO\\Projects\\test && platformio run",
+			"group": "build"
+		}
+	]
+}
