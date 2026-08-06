@@ -10,36 +10,65 @@ class ButtonManager
 private:
     uint8_t _pin;
 
-    BleObject* _ble;
+    BleManager *_ble;
 
     SemaphoreHandle_t pressedButtonSemaphore;
     SemaphoreHandle_t releasedButtonSemaphore;
 
     volatile uint32_t _lastIntrerruptTime;
 
-    void IRAM_ATTR handleISR()
+    void handleISR()
     {
-        if(digitalRead(_pin) == LOW && millis() - _lastIntrerruptTime >= 50)
+        if (digitalRead(_pin) == LOW && millis() - _lastIntrerruptTime >= 50)
         {
             _lastIntrerruptTime = millis();
-            xSemaphoreGiveFromISR(pressedButtonSemaphore, NULL);       
+            xSemaphoreGiveFromISR(pressedButtonSemaphore, NULL);
         }
         else if (millis() - _lastIntrerruptTime >= 50)
         {
-            xSemaphoreGiveFromISR(releasedButtonSemaphore, NULL); 
+            _lastIntrerruptTime = millis();
+            xSemaphoreGiveFromISR(releasedButtonSemaphore, NULL);
         }
-
     }
 
-    static void IRAM_ATTR s_handleISR(void* arg)
+    void buttonTask()
     {
-        ButtonManager* instance = static_cast<ButtonManager*>(arg);
+        while (true)
+        {
+            if (xSemaphoreTake(pressedButtonSemaphore, portMAX_DELAY) == pdTRUE)
+            {
+                if (xSemaphoreTake(releasedButtonSemaphore, pdMS_TO_TICKS(BUTTON_TIMER)) == pdTRUE)
+                {
+                }
+                else
+                {
+                    if (!_ble->isStarted())
+                    {
+                        _ble->beginTask();
+                        
+                    }
+                    xSemaphoreTake(releasedButtonSemaphore, portMAX_DELAY);
+                }
+            }
+        }
+    }
+
+    static void s_handleISR(void *arg)
+    {
+        ButtonManager *instance = static_cast<ButtonManager *>(arg);
 
         instance->handleISR();
     }
 
+    static void s_buttonTask(void *arg)
+    {
+        ButtonManager *instance = static_cast<ButtonManager *>(arg);
+
+        instance->buttonTask();
+    }
+
 public:
-    void begin(uint8_t pin, BleObject* ble)
+    void begin(uint8_t pin, BleManager *ble)
     {
         _pin = pin;
         _ble = ble;
@@ -56,6 +85,12 @@ public:
 
     void beginTask()
     {
-        
+        xTaskCreate(
+            s_buttonTask,
+            "Button task",
+            2048,
+            this,
+            1,
+            NULL);
     }
 };

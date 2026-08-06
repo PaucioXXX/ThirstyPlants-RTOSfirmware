@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 
-constexpr uint8_t BOOT_BUTTON_PIN = 27;
+constexpr uint8_t BLE_BUTTON_PIN = 27;
 constexpr uint8_t DHT_PIN = 28;
 constexpr uint8_t MOISTURE_PIN_1 = 34;
 constexpr uint8_t MOISTURE_PIN_2 = 35;

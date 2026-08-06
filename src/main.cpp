@@ -1,23 +1,25 @@
 #include <Arduino.h>
 #include <BoardPins.h>
-#include "NetworkManager.h"
 #include "DatabaseManager.h"
 #include "SensorsManager.h"
 #include "SensorsHandling.h"
-#include <BleManager.h>
+#include "BleManager.h"
+#include "ButtonManager.h"
 
-BleObject fBLE;
+
+BleManager fBLE;
+ButtonManager fButton;
+WiFiManager fWifi;
 
 void setup() 
 {
     Serial.begin(115200);
-    fBLE.beginTask();
+    fButton.begin(BLE_BUTTON_PIN, &fBLE); 
+    fButton.beginTask(); 
+    fBLE.begin(&fWifi);
 }
 
 void loop()
 {  
-    if (fBLE.isStarted())
-    {
-        fBLE.startBLE();
-    }
+
 }

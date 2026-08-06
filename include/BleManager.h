@@ -4,18 +4,25 @@
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
-#include "Secrets.h"
+#include <Secrets.h>
+#include <BoardPins.h>
+#include <WiFiManager.h>
+
+#define CREDENTIALS_SEPARATOR ";;"
 
 
-class BleObject
+class BleManager
 {
 private:
     volatile bool _bleStarted = false;
     volatile bool _newCredentialsReceived = false;
+    char _recievedCredentials[128] = {0};
+
+    WiFiManager * _wifiManager;
 
     static void startBleTask(void *pvParameters)
     {
-        BleObject *BLE = static_cast<BleObject *>(pvParameters);
+        BleManager *BLE = static_cast<BleManager *>(pvParameters);
 
         BLE->startBLE();
 
@@ -28,10 +35,10 @@ private:
     class credentialsCallbacks : public BLECharacteristicCallbacks
     {
     private:
-        BleObject *_manager;
+        BleManager *_manager;
 
     public:
-        credentialsCallbacks(BleObject *manager)
+        credentialsCallbacks(BleManager *manager)
         {
             _manager = manager;
         }
@@ -43,8 +50,24 @@ private:
 
             Serial.printf("WiFI and Pass: %s \n", credentialsAsString);
 
+            strlcpy(_manager->_recievedCredentials, credentialsAsString, sizeof(_manager->_recievedCredentials));
             _manager->_newCredentialsReceived = true;
 
+            parsingCredentials();
+        }
+
+        void parsingCredentials()
+        {   
+            char * separator = strstr(_manager->_recievedCredentials, CREDENTIALS_SEPARATOR);
+
+            if(separator != NULL)
+            {
+                separator[0] = '\0';
+
+                _manager->_wifiManager->setCredentials(_manager->_recievedCredentials, separator + 2);
+            }
+            
+        
         }
     };
 
@@ -68,6 +91,11 @@ public:
         _bleStarted = true;
     }
 
+    void begin(WiFiManager * wifiManager)
+    {
+        _wifiManager = wifiManager;
+    }
+
     void beginTask()
     {
         xTaskCreate(
@@ -84,8 +112,5 @@ public:
     {
         return _bleStarted;
     }
-
-    
-
 
 };
