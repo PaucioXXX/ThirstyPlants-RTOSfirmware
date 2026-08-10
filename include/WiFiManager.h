@@ -8,13 +8,24 @@ class WiFiManager
 private:
     char _WiFiPass[64] = {0};
     char _WiFiSSID[64] = {0};
+    char _macAdress[64] = {0};
+    char _networkDisplayId[64] = {0};
 
     static void s_wifiTask(void *arg)
     {
-        WiFiManager * instance = static_cast<WiFiManager*>(arg);
-        instance -> connectToWiFi();
-        vTaskDelete(NULL);
+        WiFiManager * _manager = static_cast<WiFiManager*>(arg);
+
+        strcpy(_manager->_networkDisplayId, "Thirsty Plants");
+        strcpy(_manager->_macAdress, WiFi.macAddress().c_str());
+        strcat(_manager->_networkDisplayId, _manager->_macAdress);
+        
+        WiFi.setHostname(_manager->_networkDisplayId);
+        
+        _manager -> connectToWiFi();
+        
+        vTaskDelete(nullptr);
     }
+
 public:
     void connectToWiFi()
     {
@@ -48,7 +59,7 @@ public:
         );
     }
 
-    bool isWiFiConnected()
+    bool isConnected()
     {
         return (WiFi.status() == WL_CONNECTED);
     }

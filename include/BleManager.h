@@ -22,14 +22,17 @@ private:
 
     static void startBleTask(void *pvParameters)
     {
-        BleManager *BLE = static_cast<BleManager *>(pvParameters);
+        BleManager *_manager = static_cast<BleManager *>(pvParameters);
 
-        BLE->startBLE();
+        _manager->startBLE();
+        
 
-        while (true)
+        while (!_manager->_wifiManager->isConnected())
         {
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
+        BLEDevice::deinit();
+        vTaskDelete(nullptr);
     }
 
     class credentialsCallbacks : public BLECharacteristicCallbacks
@@ -60,14 +63,14 @@ private:
         {   
             char * separator = strstr(_manager->_recievedCredentials, CREDENTIALS_SEPARATOR);
 
-            if(separator != NULL)
+            if(separator != nullptr)
             {
                 separator[0] = '\0';
 
                 _manager->_wifiManager->setCredentials(_manager->_recievedCredentials, separator + 2);
+                _manager->_wifiManager->beginTask();
             }
             
-        
         }
     };
 
@@ -91,7 +94,7 @@ public:
         _bleStarted = true;
     }
 
-    void begin(WiFiManager * wifiManager)
+    void setWiFi(WiFiManager * wifiManager)
     {
         _wifiManager = wifiManager;
     }
@@ -104,7 +107,7 @@ public:
             4096,
             this,
             1,
-            NULL
+            nullptr
         );
     }
 
