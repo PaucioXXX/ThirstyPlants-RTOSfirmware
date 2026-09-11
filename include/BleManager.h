@@ -4,12 +4,10 @@
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
-#include <Secrets.h>
-#include <BoardPins.h>
-#include <WiFiManager.h>
 
-#define CREDENTIALS_SEPARATOR ";;"
-
+#include "Secrets.h"
+#include "BoardPins.h"
+#include "WiFiManager.h"
 
 class BleManager
 {
@@ -18,20 +16,25 @@ private:
     volatile bool _newCredentialsReceived = false;
     char _recievedCredentials[128] = {0};
 
-    WiFiManager * _wifiManager;
+    WiFiManager *_wifiManager = nullptr;
+    BLEServer *_pServer = nullptr;
+    BLECharacteristicCallbacks *_callbacks = nullptr;
 
     static void startBleTask(void *pvParameters)
     {
         BleManager *_manager = static_cast<BleManager *>(pvParameters);
 
         _manager->startBLE();
-        
 
         while (!_manager->_wifiManager->isConnected())
         {
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
-        BLEDevice::deinit();
+
+        vTaskDelay(pdMS_TO_TICKS(700));
+
+        _manager -> stopBLE();
+
         vTaskDelete(nullptr);
     }
 
@@ -51,7 +54,7 @@ private:
 
             snprintf(credentialsAsString, sizeof(credentialsAsString), "%s", pCharacteristic->getValue().c_str());
 
-            Serial.printf("WiFI and Pass: %s \n", credentialsAsString);
+            Serial.printf("WiFI and Pass: %s \n", credentialsAsString); // debug 
 
             strlcpy(_manager->_recievedCredentials, credentialsAsString, sizeof(_manager->_recievedCredentials));
             _manager->_newCredentialsReceived = true;
@@ -92,6 +95,22 @@ public:
         Serial.println("Waiting for a client connection to notify...");
 
         _bleStarted = true;
+    }
+
+    void stopBLE()
+    {
+        if (!_bleStarted) return;
+
+        if (_pServer != nullptr)
+        {
+            _pServer->getAdvertising()->stop();
+        }
+        BLEDevice::deinit(true);
+
+        delete _callbacks;
+        _callbacks = nullptr;
+        _pServer = nullptr;
+        _bleStarted = false;
     }
 
     void setWiFi(WiFiManager * wifiManager)

@@ -90,7 +90,7 @@ public:
             "Button task",
             2048,
             this,
-            1,
-            NULL);
+            2,
+            nullptr);
     }
 };
