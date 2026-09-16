@@ -3,20 +3,29 @@
 #include <BoardPins.h>
 #include "DatabaseManager.h"
 #include "SensorsManager.h"
-#include "SensorsHandling.h"
 #include "BleManager.h"
 #include "ButtonManager.h"
+#include "Secrets.h"
+#include "PumpManager.h"
 
 BleManager g_BLE;
 ButtonManager g_Button;
 WiFiManager g_WiFi;
 DatabaseManager g_Database;
+PumpManager g_Pump;
+SensorsManager g_Sensors;
 
 bool fbi; // debug
 
 uint32_t lastTime = 0; // debug
 
-char g_macAddress[13];
+char g_macAddress[13] = {0};
+char g_deviceName[64] = {0};
+
+void setDeviceName()
+{
+    snprintf(g_deviceName, sizeof(g_deviceName), "%s", "DefaultDeviceName");
+}
 
 void getMacAdress()
 {
@@ -35,9 +44,12 @@ void setup()
     Serial.begin(115200);
 
     getMacAdress();
+    setDeviceName();
 
-    g_Button.begin(BLE_BUTTON_PIN, &g_BLE);
+    g_Button.setupButton(BLE_BUTTON_PIN, &g_BLE);
     g_Button.beginTask();
+    g_Pump.setSensorsManager(&g_Sensors);
+    g_Sensors.beginTask();
     g_WiFi.setDatabase(&g_Database);
 
     g_BLE.setWiFi(&g_WiFi);

@@ -1,106 +1,54 @@
 #pragma once
 
 #include <Arduino.h>
-#include <Secrets.h>
+#include "Secrets.h"
 #include <Firebase_ESP_Client.h>
 #include <addons/TokenHelper.h>
 #include <addons/RTDBHelper.h>
+
+
+extern char g_macAddress[13];
 
 class DatabaseManager
 {
 private:
     FirebaseConfig _config;
     FirebaseAuth _auth;
+    
     FirebaseData _fbdo;
+    FirebaseData _streamFbdo;
+
     FirebaseJson _json;
-    char _databasePath[128];
-    char _devicePath[160];
+
+    TaskHandle_t _databaseTaskHandle = nullptr;
+
+    char _databaseUserPath[128] = {0};  // users/<databaseUID>
+    char _databaseDevicePath[192] = {0}; // users/<databaseUID>/<deviceMACAdress>
+    char _databasePingPath[192] = {0}; // users/<databaseUID>/<deviceMACAdress>/online
+    char _databaseSoilMoisturePath[192] = {0}; // users/<databaseUID>/<deviceMACAdress>/moistureSensor/<moistureSensorValue>
+    char _databaseCommandsPath[192] = {0}; // users/<databaseUID>/<deviceMACAdress>/commands
     bool _isAuthenticated = false;
 
-    static void s_databaseTask(void *arg)
-    {
-        DatabaseManager *_manager = static_cast<DatabaseManager *>(arg);
+    unsigned long _lastUploadTimeMS = 0;
+    static constexpr unsigned long UPLOAD_INTERVAL_MS = 10000; //debug
 
-        _manager->setupFirebase();
-        
-        while(true)
-        {
-            if(_manager -> _isAuthenticated)
-            {
-                _manager -> pingRTDB();
-            }
 
-            vTaskDelay(pdMS_TO_TICKS(10000));
-        }
+    static void s_databaseTask(void *arg);
 
-    }
+    void setupFirebase();
 
-    void setupFirebase()
-    {
-        _config.api_key = API_KEY;
-        _config.database_url = FIREBASE_HOST;
+    void uploadHeartbeat(); // does nothing atp, should upload periodical timestamps
 
-        _auth.user.email = DEMO_FIREBASE_EMAIL;
-        _auth.user.password = DEMO_FIREBASE_PASSWORD;
+    void listenForDatabaseCommands();
 
-        _config.token_status_callback = tokenStatusCallback;
-        Firebase.begin(&_config, &_auth);
-        Firebase.reconnectWiFi(true);
+    void executeFactoryReset();
 
-        Serial.println("Authenticating"); // debug
-        uint8_t retries = 0;
-        while (_auth.token.uid == "" && retries < 40)
-        {
-            vTaskDelay(pdMS_TO_TICKS(500));
-            retries++;
-            Serial.print(".");
-        }
-        Serial.print("Authenticated! Logged into UID: "); // debug
-        Serial.print(_auth.token.uid.c_str());             // debug
-
-        if (_auth.token.uid != "")
-        {
-            Serial.println("\n Authenticated successfully!"); // debug
-            Serial.print(" Device UID: "); // debug
-            Serial.println(_auth.token.uid.c_str()); // debug
-
-            snprintf(_devicePath, sizeof(_devicePath), "devices/%s", _auth.token.uid.c_str());
-            _isAuthenticated = true;
-        }
-        snprintf(_databasePath, sizeof(_databasePath), DATABASE_ROOT_PATH, _auth.token.uid.c_str());
-    }
 
 public:
-    void pingRTDB()
-    {
-        if (Firebase.RTDB.setBool(&_fbdo, "users/testuser/devices/deviceID/online", true))
-        {
-            Serial.println("Succes"); // debug
-        }
-        else
-        {
-            Serial.println(_fbdo.errorReason()); // debug
-        }
-    }
 
-    void uploadHeartbeat()
-    {
-        
-    }
+    void pingRTDB();
 
-    void uploadSensorData(int sensorValue)
-    {
-        // Firebase.RTDB.setInt(&fbdo, databasePath, sensorValue);
-    }
+    void uploadSensorData(int sensorValue);
 
-    void beginTask()
-    {
-        xTaskCreate(
-            s_databaseTask,
-            "Database Task",
-            8192,
-            this,
-            1,
-            NULL);
-    }
+    void beginTask();
 };

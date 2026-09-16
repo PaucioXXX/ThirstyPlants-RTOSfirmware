@@ -9,34 +9,21 @@
 #include "BoardPins.h"
 #include "WiFiManager.h"
 
+extern char g_deviceName[64];
+
 class BleManager
 {
 private:
     volatile bool _bleStarted = false;
     volatile bool _newCredentialsReceived = false;
-    char _recievedCredentials[128] = {0};
+    char _receivedCredentials[128] = {0};
 
     WiFiManager *_wifiManager = nullptr;
     BLEServer *_pServer = nullptr;
+    BLECharacteristic *_pCharacteristic = nullptr;
     BLECharacteristicCallbacks *_callbacks = nullptr;
 
-    static void startBleTask(void *pvParameters)
-    {
-        BleManager *_manager = static_cast<BleManager *>(pvParameters);
-
-        _manager->startBLE();
-
-        while (!_manager->_wifiManager->isConnected())
-        {
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(700));
-
-        _manager -> stopBLE();
-
-        vTaskDelete(nullptr);
-    }
+    static void startBleTask(void *arg);
 
     class credentialsCallbacks : public BLECharacteristicCallbacks
     {
@@ -44,95 +31,24 @@ private:
         BleManager *_manager;
 
     public:
-        credentialsCallbacks(BleManager *manager)
-        {
-            _manager = manager;
-        }
-        void onWrite(BLECharacteristic *pCharacteristic)
-        {
-            char credentialsAsString[128];
+        credentialsCallbacks(BleManager *manager);
 
-            snprintf(credentialsAsString, sizeof(credentialsAsString), "%s", pCharacteristic->getValue().c_str());
+        void onWrite(BLECharacteristic *pCharacteristic);
 
-            Serial.printf("WiFI and Pass: %s \n", credentialsAsString); // debug 
-
-            strlcpy(_manager->_recievedCredentials, credentialsAsString, sizeof(_manager->_recievedCredentials));
-            _manager->_newCredentialsReceived = true;
-
-            parsingCredentials();
-        }
-
-        void parsingCredentials()
-        {   
-            char * separator = strstr(_manager->_recievedCredentials, CREDENTIALS_SEPARATOR);
-
-            if(separator != nullptr)
-            {
-                separator[0] = '\0';
-
-                _manager->_wifiManager->setCredentials(_manager->_recievedCredentials, separator + 2);
-                _manager->_wifiManager->beginTask();
-            }
-            
-        }
+        void parseCredentials();
     };
 
+    void startBLE();
+    void stopBLE();
+    
+
 public:
-    void startBLE()
-    {
-        BLEDevice::init("My ESP32");
-        BLEServer *pServer = BLEDevice::createServer();
-        BLEService *pService = pServer->createService(SERVICE_UUID);
-        BLECharacteristic *pCharacteristic = pService->createCharacteristic(
-            CHARACTERISTIC_UUID,
-            BLECharacteristic::PROPERTY_READ |
-                BLECharacteristic::PROPERTY_WRITE);
+    
+    void setWiFi(WiFiManager * wifiManager);
 
-        pCharacteristic->setCallbacks(new credentialsCallbacks(this));
-        pService->start();
-        pServer->getAdvertising()->start();
+    void beginTask();
 
-        Serial.println("Waiting for a client connection to notify...");
+    bool isStarted();
 
-        _bleStarted = true;
-    }
-
-    void stopBLE()
-    {
-        if (!_bleStarted) return;
-
-        if (_pServer != nullptr)
-        {
-            _pServer->getAdvertising()->stop();
-        }
-        BLEDevice::deinit(true);
-
-        delete _callbacks;
-        _callbacks = nullptr;
-        _pServer = nullptr;
-        _bleStarted = false;
-    }
-
-    void setWiFi(WiFiManager * wifiManager)
-    {
-        _wifiManager = wifiManager;
-    }
-
-    void beginTask()
-    {
-        xTaskCreate(
-            startBleTask,
-            "BLE Task",
-            4096,
-            this,
-            1,
-            nullptr
-        );
-    }
-
-    bool isStarted()
-    {
-        return _bleStarted;
-    }
 
 };

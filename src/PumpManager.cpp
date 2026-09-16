@@ -1,71 +1,71 @@
-#include "PumpManager.h"
-#include <BoardPins.h>
-#include <SensorsHandling.h>
-
 #include <Arduino.h>
+#include "SensorsManager.h"
+#include "PumpManager.h"
+#include "BoardPins.h"
 
-enum class CriticalPumpErrors : uint8_t 
+
+void PumpManager::s_pumpTask(void * arg)
 {
-    OK = 0,
-    OVERDRY,
-    OVERFLOW,
-    TIMEOUT
-};
+    PumpManager *_manager = static_cast<PumpManager *>(arg);
 
-constexpr uint8_t MIN_MOISTURE_PERCENTAGE_LIMIT = 20;
-constexpr uint8_t MAX_MOISTURE_PERCENTAGE_LIMIT = 60;
-constexpr uint32_t SAFETY_PUMP_RUNTIME_MS = 30 * 1000;
-
-uint32_t pumpLastTimeMs = 0;
-uint32_t pumpStartTimeMs = 0;
-bool isPumpRunning = false;
-
-static bool checkPumpTimer(uint32_t intervalToCheckMs)
-{
-    if  (millis() - pumpLastTimeMs >= intervalToCheckMs)
+    while(true)
     {
-        pumpLastTimeMs = millis();
+        _manager -> handlePump();
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+void PumpManager::setSensorsManager(SensorsManager * sensorsManager)
+{
+    _sensorsManager = sensorsManager;
+}
+
+bool PumpManager::checkPumpTimer(uint32_t intervalToCheckMS)
+{
+    if  (millis() - pumpLastTimeMS >= intervalToCheckMS)
+    {
+        pumpLastTimeMS = millis();
         return true;
     }
     return false;
 }
 
-static void turnOnPump()
+void PumpManager::turnOnPump()
 {
     digitalWrite(PUMP_PIN, HIGH);
 
     if (!isPumpRunning)
     {
-        pumpStartTimeMs = millis();
+        pumpStartTimeMS = millis();
         isPumpRunning = true;
-    }
-    
+    }  
 }
 
-static void turnOffPump()
+void PumpManager::turnOffPump()
 {
     digitalWrite(PUMP_PIN, LOW);
 
     isPumpRunning = false;
 }
 
-static CriticalPumpErrors checkPumpCriticalStates()
+CriticalPumpErrors PumpManager::checkPumpCriticalStates()
 {
-    if (isPumpRunning && (millis() - pumpStartTimeMs >= SAFETY_PUMP_RUNTIME_MS))
+    if (isPumpRunning && (millis() - pumpStartTimeMS >= SAFETY_PUMP_RUNTIME_MS))
     {
         return CriticalPumpErrors::TIMEOUT;
     }
 
-    if (moisturePercent <= MIN_MOISTURE_PERCENTAGE_LIMIT)
+    if (_sensorsManager -> getMoisturePercent(1) <= MIN_MOISTURE_PERCENTAGE_LIMIT)
         return CriticalPumpErrors::OVERDRY;
 
-    if (moisturePercent >= MAX_MOISTURE_PERCENTAGE_LIMIT) 
+    if (_sensorsManager -> getMoisturePercent(1) >= MAX_MOISTURE_PERCENTAGE_LIMIT) 
         return CriticalPumpErrors::OVERFLOW;
 
     return CriticalPumpErrors::OK;
 }
 
-void handlePump()
+void PumpManager::handlePump()
 {
     CriticalPumpErrors pumpState = checkPumpCriticalStates();
 
@@ -86,4 +86,17 @@ void handlePump()
         
     }
 
+}
+
+void PumpManager::beginTask()
+{
+    xTaskCreatePinnedToCore(
+        s_pumpTask,
+        "Pump Task",
+        2048,
+        this,
+        2,
+        nullptr,
+        1
+    );
 }
