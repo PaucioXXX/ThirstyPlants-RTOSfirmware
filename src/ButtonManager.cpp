@@ -2,15 +2,11 @@
 
 void ButtonManager::handleISR()
 {
-    if (digitalRead(_pin) == LOW && millis() - _lastIntrerruptTime >= 50)
+    if (millis() - _lastInterruptTimeMS >= 50)
     {
-        _lastIntrerruptTime = millis();
-        xSemaphoreGiveFromISR(pressedButtonSemaphore, NULL);
-    }
-    else if (millis() - _lastIntrerruptTime >= 50)
-    {
-        _lastIntrerruptTime = millis();
-        xSemaphoreGiveFromISR(releasedButtonSemaphore, NULL);
+        _lastInterruptTimeMS = millis();
+
+        xSemaphoreGiveFromISR(pressedButtonSemaphore, nullptr);
     }
 }
 
@@ -18,18 +14,20 @@ void ButtonManager::buttonTask()
 {
     while (true)
     {
+
         if (xSemaphoreTake(pressedButtonSemaphore, portMAX_DELAY) == pdTRUE)
         {
-            if (xSemaphoreTake(releasedButtonSemaphore, pdMS_TO_TICKS(BUTTON_TIMER)) == pdTRUE)
+            if (digitalRead(_pin) == LOW)
             {
-            }
-            else
-            {
-                if (!_ble->isStarted())
+                if (xSemaphoreTake(pressedButtonSemaphore, pdMS_TO_TICKS(BUTTON_TIMER)) == pdFALSE)
                 {
-                    _ble->beginTask();
+                    if (!_bleManager->isStarted())
+                    {
+                        _bleManager->beginTask();
+                    }
+
+                    xSemaphoreTake(pressedButtonSemaphore, portMAX_DELAY);
                 }
-                xSemaphoreTake(releasedButtonSemaphore, portMAX_DELAY);
             }
         }
     }
@@ -37,29 +35,28 @@ void ButtonManager::buttonTask()
 
 void ButtonManager::s_handleISR(void *arg)
 {
-    ButtonManager *instance = static_cast<ButtonManager *>(arg);
+    ButtonManager *_manager = static_cast<ButtonManager *>(arg);
 
-    instance->handleISR();
+    _manager->handleISR();
 }
 
 void ButtonManager::s_buttonTask(void *arg)
 {
-    ButtonManager *instance = static_cast<ButtonManager *>(arg);
+    ButtonManager *_manager = static_cast<ButtonManager *>(arg);
 
-    instance->buttonTask();
+    _manager->buttonTask();
 }
 
-void ButtonManager::setupButton(uint8_t pin, BleManager *ble)
+void ButtonManager::setupButton(uint8_t pin, BleManager *bleManager)
 {
     _pin = pin;
-    _ble = ble;
+    _bleManager = bleManager;
 
     pressedButtonSemaphore = xSemaphoreCreateBinary();
-    releasedButtonSemaphore = xSemaphoreCreateBinary();
 
     pinMode(_pin, INPUT_PULLUP);
 
-    _lastIntrerruptTime = 0;
+    _lastInterruptTimeMS = 0;
 
     attachInterruptArg(_pin, s_handleISR, this, CHANGE);
 }

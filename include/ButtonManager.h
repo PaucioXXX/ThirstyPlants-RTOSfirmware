@@ -10,12 +10,12 @@ class ButtonManager
 private:
     uint8_t _pin;
 
-    BleManager *_ble;
+    BleManager *_bleManager;
 
     SemaphoreHandle_t pressedButtonSemaphore;
     SemaphoreHandle_t releasedButtonSemaphore;
 
-    volatile uint32_t _lastIntrerruptTime;
+    uint64_t _lastInterruptTimeMS; 
 
     void handleISR();
 

@@ -26,15 +26,15 @@ private:
     uint8_t _bufferIndex;
     uint16_t _rawMoistureFiltered;
     uint8_t _moisturePercent;
-    uint32_t _sensorLastTimeMS;
-    uint32_t _bufferLastTimeMS;
     uint32_t _bufferTimerMS;
 
 
 public:
     MoistureSensor(uint8_t sensorPin);
 
-    void readAndProcess();
+    void begin();
+
+    bool readAndProcess();
 
     bool checkTimer(uint32_t intervalToCheckMS, uint32_t &lastCheckMS);
 

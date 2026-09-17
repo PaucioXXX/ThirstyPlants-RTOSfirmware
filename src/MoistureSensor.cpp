@@ -3,15 +3,19 @@
 #include <Arduino.h>
 #include "Filters.h"
 
+void MoistureSensor::begin()
+{
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    
+}
+
 MoistureSensor::MoistureSensor(uint8_t sensorPin)
     : _sensorPin(sensorPin),
       _rawMoistureBuffer{0},
       _bufferIndex(0),
       _rawMoistureFiltered(0),
-      _moisturePercent(0),
-      _sensorLastTimeMS(0),
-      _bufferLastTimeMS(0),
-      _bufferTimerMS(0)
+      _moisturePercent(0)
 {
 }
 
@@ -27,17 +31,12 @@ bool MoistureSensor::checkTimer(uint32_t intervalToCheckMS, uint32_t &lastCheckM
     return false;
 }
 
-void MoistureSensor::readAndProcess()
+bool MoistureSensor::readAndProcess()
 {
-    if (!checkTimer(_bufferTimerMS, _bufferLastTimeMS))
-    {
-        return;
-    }
 
     _rawMoistureBuffer[_bufferIndex] = analogRead(_sensorPin);
 
     _bufferIndex++;
-    
 
     if (_bufferIndex >= BUFFER_SAMPLE_COUNT)
     {
@@ -45,9 +44,11 @@ void MoistureSensor::readAndProcess()
         _moisturePercent = convertMoistureRawToPercent(_rawMoistureFiltered);
     
         _bufferIndex = 0;
+
+        return true;
     }
 
-    
+    return false;
 }
 
 bool MoistureSensor::checkMoistureValue()

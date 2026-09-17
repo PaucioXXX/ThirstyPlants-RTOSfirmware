@@ -13,9 +13,38 @@ SensorsManager::SensorsManager()
 {
 }
 
+void SensorsManager::s_sensorsManagerTask(void * arg)
+{   
+    SensorsManager * _manager = static_cast<SensorsManager *>(arg);
+
+    while(true)
+    {
+        bool isMoistureSensor1Ready = _manager->_moistureSensor1.readAndProcess();
+        bool isMoistureSensor2Ready = _manager->_moistureSensor2.readAndProcess();
+
+        if(isMoistureSensor1Ready && isMoistureSensor2Ready)
+        {
+            _manager->_latestHumidityReading = _manager->_temperatureSensor.readHumidity();
+            _manager->_latestTemperatureReading = _manager->_temperatureSensor.readTemperature();
+            _manager->_latestMoisturePercent1 = _manager->getMoisturePercent(1); 
+            _manager->_latestMoisturePercent2 = _manager->getMoisturePercent(2);
+            _manager->_latestLightReading = _manager->_lightingSensor.readLightLevel();
+
+            vTaskDelay(pdMS_TO_TICKS(_manager->_moistureReadingTimerMS));
+        }
+        else
+        {
+            vTaskDelay(pdMS_TO_TICKS(_manager->_moistureBufferTimerMS));
+        }
+    }
+}
+
 void SensorsManager::setupSensors()
 {
     _temperatureSensor.begin();
+
+    _moistureSensor1.begin();
+    _moistureSensor2.begin();
 
     Wire.begin();
     _lightingSensor.begin();
@@ -45,13 +74,13 @@ uint8_t SensorsManager::calculateValidMoisture()
 
     if (isMoistureSensor1Healthy)
     {
-        moisturePercentSum += _moistureSensor1.getMoisturePercent();
+        moisturePercentSum += _latestMoisturePercent1;
         healthySensorCount ++;
     }
 
     if (isMoistureSensor2Healthy)
     {
-        moisturePercentSum += _moistureSensor2.getMoisturePercent();
+        moisturePercentSum += _latestMoisturePercent2;
         healthySensorCount ++;
     }
 
