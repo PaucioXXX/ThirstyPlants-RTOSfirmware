@@ -87,7 +87,14 @@ uint8_t SensorsManager::calculateValidMoisture()
     if (healthySensorCount == 0)
         return 0;
 
-    return static_cast<uint8_t>(moisturePercentSum / healthySensorCount);
+    _latestValidMoisture = static_cast<uint8_t>(moisturePercentSum / healthySensorCount);
+
+    return _latestValidMoisture;
+}
+
+uint8_t SensorsManager::getValidMoisture()
+{
+    return _latestValidMoisture;
 }
 
 void SensorsManager::beginTask()

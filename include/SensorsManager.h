@@ -7,6 +7,7 @@
 #include <Wire.h>
 #include <BH1750.h>
 
+extern SemaphoreHandle_t g_pumpwakeSemaphore;
 
 class SensorsManager
 {
@@ -22,6 +23,7 @@ class SensorsManager
 
         uint8_t _latestMoisturePercent1;
         uint8_t _latestMoisturePercent2;
+        uint8_t _latestValidMoisture;
 
         float _latestLightReading = 0.0f;
         float _latestTemperatureReading = 0.0f;
@@ -41,6 +43,8 @@ class SensorsManager
         uint8_t getMoisturePercent(uint8_t whichSensor);
 
         uint8_t calculateValidMoisture();
+
+        uint8_t getValidMoisture();
 
         void beginTask();
 };

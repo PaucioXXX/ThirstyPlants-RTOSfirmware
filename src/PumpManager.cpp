@@ -10,9 +10,16 @@ void PumpManager::s_pumpTask(void * arg)
 
     while(true)
     {
-        _manager -> handlePump();
+        if (_manager->_isPumpRunning)
+        {
+            xSemaphoreTake(g_pumpWakeSemaphore, pdMS_TO_TICKS(500));
+        }
+        else
+        {
+            xSemaphoreTake(g_pumpWakeSemaphore, portMAX_DELAY);
+        }
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        _manager->handlePump();
     }
 }
 
@@ -21,46 +28,56 @@ void PumpManager::setSensorsManager(SensorsManager * sensorsManager)
     _sensorsManager = sensorsManager;
 }
 
-bool PumpManager::checkPumpTimer(uint32_t intervalToCheckMS)
-{
-    if  (millis() - pumpLastTimeMS >= intervalToCheckMS)
-    {
-        pumpLastTimeMS = millis();
-        return true;
-    }
-    return false;
-}
 
 void PumpManager::turnOnPump()
 {
+    if (!_isPumpRunning)
+    {
+
     digitalWrite(PUMP_PIN, HIGH);
 
-    if (!isPumpRunning)
-    {
-        pumpStartTimeMS = millis();
-        isPumpRunning = true;
-    }  
+    _pumpStartTimeMS = millis();
+    
+    _isPumpRunning = true;
+    
+    }
 }
 
 void PumpManager::turnOffPump()
 {
     digitalWrite(PUMP_PIN, LOW);
 
-    isPumpRunning = false;
+    _isPumpRunning = false;
 }
 
 CriticalPumpErrors PumpManager::checkPumpCriticalStates()
 {
-    if (isPumpRunning && (millis() - pumpStartTimeMS >= SAFETY_PUMP_RUNTIME_MS))
+
+    if (_sensorsManager == nullptr)
     {
-        return CriticalPumpErrors::TIMEOUT;
+        return CriticalPumpErrors::SENSOR_UNAVAILABLE;
     }
 
-    if (_sensorsManager -> getMoisturePercent(1) <= MIN_MOISTURE_PERCENTAGE_LIMIT)
-        return CriticalPumpErrors::OVERDRY;
+    if (_isPumpRunning)
+    {
+        if ((millis() - _pumpStartTimeMS >= SAFETY_PUMP_RUNTIME_MS))
+        {
+            return CriticalPumpErrors::TIMEOUT;
+        }
 
-    if (_sensorsManager -> getMoisturePercent(1) >= MAX_MOISTURE_PERCENTAGE_LIMIT) 
-        return CriticalPumpErrors::OVERFLOW;
+        if (_sensorsManager->getValidMoisture() >= MAX_MOISTURE_PERCENTAGE_LIMIT)
+        {
+            return CriticalPumpErrors::OVERFLOW;
+        }
+    }
+
+    if (!_isPumpRunning)
+    {
+        if (_sensorsManager->getValidMoisture() <= MIN_MOISTURE_PERCENTAGE_LIMIT)
+        {
+            return CriticalPumpErrors::OVERDRY;
+        }
+    }
 
     return CriticalPumpErrors::OK;
 }
@@ -90,6 +107,8 @@ void PumpManager::handlePump()
 
 void PumpManager::beginTask()
 {
+    pinMode(PUMP_PIN, OUTPUT);
+
     xTaskCreatePinnedToCore(
         s_pumpTask,
         "Pump Task",

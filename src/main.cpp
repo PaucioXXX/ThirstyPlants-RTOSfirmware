@@ -8,6 +8,8 @@
 #include "Secrets.h"
 #include "PumpManager.h"
 
+SemaphoreHandle_t g_pumpWakeSemaphore = nullptr;
+
 BleManager g_BLE;
 ButtonManager g_Button;
 WiFiManager g_WiFi;
@@ -15,9 +17,6 @@ DatabaseManager g_Database;
 PumpManager g_Pump;
 SensorsManager g_Sensors;
 
-bool fbi; // debug
-
-uint32_t lastTime = 0; // debug
 
 char g_macAddress[13] = {0};
 char g_deviceName[64] = {0};
@@ -46,10 +45,16 @@ void setup()
     getMacAdress();
     setDeviceName();
 
+    g_pumpWakeSemaphore = xSemaphoreCreateBinary();
+
     g_Button.setupButton(BLE_BUTTON_PIN, &g_BLE);
     g_Button.beginTask();
+    
     g_Pump.setSensorsManager(&g_Sensors);
+    g_Pump.beginTask();
+    
     g_Sensors.beginTask();
+    
     g_WiFi.setDatabase(&g_Database);
 
     g_BLE.setWiFi(&g_WiFi);
@@ -67,5 +72,5 @@ void setup()
 
 void loop()
 {
-    vTaskDelay(1000);
+    vTaskDelete(nullptr);
 }
